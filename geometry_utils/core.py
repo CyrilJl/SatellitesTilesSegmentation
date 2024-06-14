@@ -1,8 +1,9 @@
 from time import sleep
-from typing import Generator, Iterable, Tuple, Union
+from typing import Iterable, Tuple, Union
 
 import geopandas as gpd
 import numpy as np
+import osmnx as ox
 import pyproj
 from shapely.geometry import Polygon
 
@@ -55,36 +56,6 @@ def to_crs(proj: Union[str, int, pyproj.CRS, pyproj.Proj, None]) -> pyproj.CRS:
     if proj is None:
         return None
     raise TypeError("`proj` type is not supported.")
-
-
-def covering_mesh(gdf: gpd.GeoDataFrame, cell_size: float, return_xy: bool = False, round: int = None, return_indices: bool = False) -> gpd.GeoDataFrame:
-    """
-    Generates a regular grid covering the bounding box of a GeoDataFrame.
-
-    Parameters:
-    - gdf (gpd.GeoDataFrame): Input GeoDataFrame.
-    - cell_size (float): Size of grid cells.
-    - return_xy (bool, optional): Whether to return x, y coordinates along with the grid. Default is False.
-    - round (int, optional): Number of decimal places to round grid coordinates to. Default is None.
-    - return_indices (bool, optional): Whether to return grid indices. Default is False.
-
-    Returns:
-    - gpd.GeoDataFrame or Tuple[np.ndarray, np.ndarray, gpd.GeoDataFrame]: If `return_xy` is True, returns x, y coordinates and the grid as a GeoDataFrame. Otherwise, returns only the grid.
-
-    """
-    xmin, ymin, xmax, ymax = gdf.total_bounds
-    x = np.arange(start=xmin, stop=xmax+cell_size, step=cell_size)
-    y = np.arange(start=ymin, stop=ymax+cell_size, step=cell_size)
-    x = x - x.mean() + (xmin + xmax)/2.
-    y = y - y.mean() + (ymin + ymax)/2.
-    if isinstance(round, int):
-        x, y = np.round(x, round), np.round(y, round)
-    xx, yy = np.meshgrid(x, y)
-    grid = generate_grid(xx, yy, return_indices=return_indices, crs=gdf.crs)
-    if return_xy:
-        return x, y, grid
-    else:
-        return grid
 
 
 def generate_grid(grid_x: np.ndarray, grid_y: np.ndarray, return_indices: bool = False, crs=None) -> gpd.GeoDataFrame:
@@ -140,40 +111,6 @@ def generate_grid(grid_x: np.ndarray, grid_y: np.ndarray, return_indices: bool =
     return gdf_grid
 
 
-def generator_geopandas(path: str, batch_size: int = 25_000, max_row: int = None, **kwargs) -> Generator[gpd.GeoDataFrame, None, None]:
-    """
-    Generates batches of GeoDataFrame from a GeoPackage file.
-
-    Parameters:
-    - path (str): Path to the GeoPackage file.
-    - batch_size (int): Number of rows to read per batch. Default is 25,000.
-    - max_row (int, optional): Maximum number of rows to read. Default is None, meaning all rows will be read.
-    - **kwargs: Additional keyword arguments to pass to `geopandas.read_file`.
-
-    Yields:
-    - gpd.GeoDataFrame: A batch of GeoDataFrame.
-
-    Raises:
-    - ValueError: If batch_size is not a positive integer.
-
-    """
-    if not isinstance(batch_size, int) or batch_size <= 0:
-        raise ValueError("batch_size must be a positive integer")
-
-    i, j = 0, batch_size
-    max_row = np.inf if max_row is None else max_row
-
-    while i < max_row:
-        gdf = gpd.read_file(path, rows=slice(i, j), **kwargs)
-        yield gdf
-
-        if len(gdf) < batch_size or j >= max_row:
-            break
-
-        i += batch_size
-        j += batch_size
-
-
 def get_coordinates(place, crs=4326, retries=10, retry_delay=1, errors='raise'):
     """
     Obtains the geographical coordinates (longitude, latitude) of a given place.
@@ -224,3 +161,19 @@ def get_coordinates(place, crs=4326, retries=10, retry_delay=1, errors='raise'):
         for p in place:
             results.append(get_coordinates_single(p))
         return results
+
+
+def buildings_in_tile(bbox, crs=None, timeout=180) -> gpd.GeoDataFrame:
+    ox.settings.log_console = False
+    ox.settings.use_cache = False
+    ox.settings.requests_timeout = timeout
+
+    gdf = ox.features.features_from_bbox(bbox=bbox, tags={'building': True})
+    if crs is not None:
+        gdf = gdf.to_crs(crs)
+    return gdf
+
+
+def proj_bbox(bbox, crs_in, crs_out, buffer=0):
+    b = gpd.GeoSeries([bbox.buffer(buffer)], crs=crs_in).to_crs(crs_out)
+    return b.total_bounds
