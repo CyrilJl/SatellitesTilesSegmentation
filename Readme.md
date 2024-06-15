@@ -17,7 +17,7 @@ The first notebook is dedicated to creating the dataset. It includes the followi
 
 This notebook is fully launchable without any additional data, as it queries all necessary information dynamically.
 
-![Tiles examples](_static/tiles_15.png "Examples of segmented tiles")
+<img src="_static/tiles_15.png" width="800">
 
 ### 2. Building the Segmentation Neural Network
 
