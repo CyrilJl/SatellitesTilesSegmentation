@@ -24,6 +24,8 @@ This notebook is fully launchable without any additional data, as it queries all
 The second notebook focuses on developing a neural network to perform building segmentation:
 
 1. **Dataset Loading**: The dataset generated in the first notebook is loaded.
-2. **Model Architecture**: A U-Net architecture is built from scratch. U-Net is a convolutional neural network architecture designed for biomedical image segmentation but is also effective for other segmentation tasks.
+2. **Model Architecture**: A U-Net architecture is built from scratch, without using pre-trained component.
 3. **Training**: The model is trained using the dataset, with the goal of accurately segmenting buildings in the satellite images.
 4. **Evaluation**: The performance of the model is evaluated on a test set.
+
+<img src="_static/results_unet.png" width="800">
